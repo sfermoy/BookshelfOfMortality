@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Interactive Library with Open Book Popup and Celtic Bar Chart</title>
+  <!-- Google Font to evoke a Book of Kells style -->
+  <link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&display=swap" rel="stylesheet">
+  <style>
+    /* Use the provided background image for a traditional library,
+       darkened significantly with a brightness filter and animated for dynamic lighting */
+    #visualization {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      background: url('https://t3.ftcdn.net/jpg/06/27/35/40/360_F_627354060_095n25KeUo7Ll2YLKgiAcS46wiXoizkS.jpg') no-repeat center center;
+      background-size: cover;
+      filter: brightness(0.3);
+      animation: dynamicLight 3s infinite alternate;
+    }
+    @keyframes dynamicLight {
+      from { filter: brightness(0.3); }
+      to   { filter: brightness(0.35); }
+    }
+    /* Overall page styling */
+    body {
+      margin: 0;
+      font-family: 'Garamond', serif;
+      overflow: hidden;
+    }
+    /* Mouse styling */
+    .mouse {
+      fill: #8e8e8e;
+      stroke: #555;
+      stroke-width: 1;
+    }
+    /* Hover label styling for books */
+    .hoverLabel {
+      fill: #ffffff;
+      font-size: 10px;
+      pointer-events: none;
+    }
+    /* Popup overlay for the open book view */
+    #popup {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0,0,0,0.8);
+      display: none; /* Hidden until a book is clicked */
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    /* The open book container */
+    #popup .book-open {
+      width: 80%;
+      max-width: 800px;
+      height: 60%;
+      background: #f5f5dc;  /* Light beige simulating a book cover */
+      display: flex;
+      box-shadow: 0 0 30px rgba(0,0,0,0.5);
+      transform: scale(0.8);
+      transition: transform 0.3s ease;
+    }
+    /* The left and right pages of the open book */
+    #popup .page {
+      flex: 1;
+      margin: 10px;
+      background-color: #faf0e6; /* Soft manila page color */
+      border: 1px solid #ddd;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+      position: relative;
+      overflow: auto;
+    }
+    /* Left page will host the bar chart */
+    #chart-page {
+      width: 100%;
+      height: 100%;
+    }
+    /* Right page (now given an id for easy selection) will host descriptive text */
+    #text-page {
+      width: 100%;
+      height: 100%;
+      padding: 20px;
+      font-family: 'Garamond', serif;
+      color: #3b2f2f;
+    }
+    /* Close button for the popup */
+    #popup .close-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      color: white;
+      background: #333;
+      border: none;
+      padding: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      z-index: 1100;
+    }
+    /* Bar chart text style to evoke illuminated manuscripts */
+    .chart-text {
+      font-family: 'Uncial Antiqua', serif;
+      fill: #3b2f2f;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="visualization"></div>
+  <!-- Popup overlay for when a book is clicked -->
+  <div id="popup">
+    <button class="close-btn">Close</button>
+    <div class="book-open">
+      <!-- Left page: contains the bar chart -->
+      <div class="page" id="chart-page"></div>
+      <!-- Right page: will display text about the mortality cause -->
+      <div class="page" id="text-page"></div>
+    </div>
+  </div>
+  
+  <!-- Load D3 (v6) -->
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script>
+    /***********************
+     * Scene Setup (Library, Books, Background)
+     ***********************/
+    const width = window.innerWidth,
+          height = window.innerHeight;
+    
+    const svg = d3.select("#visualization")
+                  .append("svg")
+                  .attr("width", width)
+                  .attr("height", height);
+    
+    // Library floor
+    svg.append("rect")
+       .attr("x", 0)
+       .attr("y", height * 0.75)
+       .attr("width", width)
+       .attr("height", height * 0.25)
+       .attr("fill", "#5a3e2b");
+    
+    /***********************
+     * Far Away Bookshelves (Background)
+     ***********************/
+    const farBookshelves = svg.append("g")
+                              .attr("class", "farBookshelves")
+                              .attr("opacity", 0.3);
+    
+    // Left bookshelf
+    const shelfLeft = farBookshelves.append("g")
+      .attr("transform", `translate(50, ${height * 0.5}) scale(0.5)`);
+    shelfLeft.append("rect")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", 100)
+      .attr("height", 300)
+      .attr("fill", "#8b7d72")
+      .attr("stroke", "#7a6a5c")
+      .attr("stroke-width", 2);
+    for (let i = 1; i < 5; i++) {
+      shelfLeft.append("line")
+        .attr("x1", 0)
+        .attr("x2", 100)
+        .attr("y1", i * 60)
+        .attr("y2", i * 60)
+        .attr("stroke", "#7a6a5c")
+        .attr("stroke-width", 2);
+    }
+    
+    // Right bookshelf
+    const shelfRight = farBookshelves.append("g")
+      .attr("transform", `translate(${width - 150}, ${height * 0.5}) scale(0.5)`);
+    shelfRight.append("rect")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", 100)
+      .attr("height", 300)
+      .attr("fill", "#8b7d72")
+      .attr("stroke", "#7a6a5c")
+      .attr("stroke-width", 2);
+    for (let i = 1; i < 5; i++) {
+      shelfRight.append("line")
+        .attr("x1", 0)
+        .attr("x2", 100)
+        .attr("y1", i * 60)
+        .attr("y2", i * 60)
+        .attr("stroke", "#7a6a5c")
+        .attr("stroke-width", 2);
+    }
+    
+    /***********************
+     * Define Book Cover Gradient
+     ***********************/
+    const defs = svg.append("defs");
+    const bookGradient = defs.append("linearGradient")
+                             .attr("id", "bookGradient")
+                             .attr("x1", "0%")
+                             .attr("y1", "0%")
+                             .attr("x2", "100%")
+                             .attr("y2", "0%");
+    bookGradient.append("stop")
+                .attr("offset", "0%")
+                .attr("stop-color", "#d9c9a3");
+    bookGradient.append("stop")
+                .attr("offset", "100%")
+                .attr("stop-color", "#c9b49f");
+    
+    /***********************
+     * Book Stack Group
+     ***********************/
+    // Set y=0 at the floor.
+    const stackGroup = svg.append("g")
+                          .attr("transform", `translate(${width / 2}, ${height * 0.75})`);
+    
+    /***********************
+     * Logical Book Stacking
+     ***********************/
+    const causes = [
+      "Heart Disease", "Stroke", "Cancer", "Influenza", 
+      "Pneumonia", "Diabetes", "COPD", "Accidents", 
+      "Septicemia", "Kidney Failure"
+    ];
+    
+    // 1. Flat Books (Base Stack)
+    const flatBooks = [];
+    let currentY = 0;  // starting at ground (y = 0)
+    const numFlat = 5;
+    for (let i = 0; i < numFlat; i++) {
+      const bookLength = 80 + Math.random() * 40,
+            bookThickness = 15 + Math.random() * 15,
+            xOffset = -10 + Math.random() * 20,
+            rotation = -3 + Math.random() * 6;
+      
+      flatBooks.push({
+        type: "flat",
+        width: bookLength,
+        thickness: bookThickness,
+        xOffset: xOffset,
+        yOffset: currentY,
+        rotation: rotation,
+        cause: causes[i % causes.length]
+      });
+      currentY -= bookThickness;
+    }
+    const flatTop = currentY;
+    
+    // 2a. Upright Books Leaning on the Stack
+    const numLeanStack = 3;
+    const gapStack = 50;
+    const leaningStackBooks = d3.range(numLeanStack).map(i => {
+      const bookThickness = 15 + Math.random() * 10,
+            bookLength = 80 + Math.random() * 40,
+            xOffset = i * gapStack - ((numLeanStack - 1) * gapStack / 2),
+            rotation = 10 + Math.random() * 5;
+      return {
+        type: "lean",
+        subtype: "stack",
+        thickness: bookThickness,
+        length: bookLength,
+        xOffset: xOffset,
+        yOffset: flatTop,
+        rotation: rotation,
+        cause: causes[(numFlat + i) % causes.length]
+      };
+    });
+    
+    // 2b. Upright Books Leaning Against the Wall
+    const numLeanWall = 2;
+    const wallX = 60;
+    const leaningWallBooks = d3.range(numLeanWall).map(i => {
+      const bookThickness = 15 + Math.random() * 10,
+            bookLength = 80 + Math.random() * 40,
+            xOffset = wallX - bookThickness/2 - i * (bookThickness + 5),
+            yOffset = flatTop,
+            rotation = 15 + Math.random() * 5;
+      return {
+        type: "lean",
+        subtype: "wall",
+        thickness: bookThickness,
+        length: bookLength,
+        xOffset: xOffset,
+        yOffset: yOffset,
+        rotation: rotation,
+        cause: causes[(numFlat + numLeanStack + i) % causes.length]
+      };
+    });
+    
+    const allBooks = flatBooks.concat(leaningStackBooks, leaningWallBooks);
+    
+    /***********************
+     * Enlarged Wall (Starting at Ground)
+     ***********************/
+    const wallWidth = 60;
+    const wallHeight = Math.abs(flatTop) + 100;
+    const wallY = -wallHeight;
+    stackGroup.insert("rect", ":first-child")
+      .attr("x", wallX)
+      .attr("y", wallY)
+      .attr("width", wallWidth)
+      .attr("height", wallHeight)
+      .attr("fill", "#8b7d72")
+      .attr("stroke", "#7a6a5c")
+      .attr("stroke-width", 2)
+      .attr("rx", 3)
+      .attr("ry", 3);
+    
+    /***********************
+     * Draw Books and Add Hover Labels & Click Interaction
+     ***********************/
+    const bookGroups = stackGroup.selectAll(".bookGroup")
+      .data(allBooks)
+      .enter()
+      .append("g")
+      .attr("class", "bookGroup")
+      .attr("transform", d => `translate(${d.xOffset}, ${d.yOffset}) rotate(${d.rotation})`)
+      .attr("opacity", 0)
+      .on("mouseover", function(event, d) {
+        d3.select(this).select(".hoverLabel")
+          .transition()
+          .duration(200)
+          .attr("opacity", 1);
+      })
+      .on("mouseout", function(event, d) {
+        d3.select(this).select(".hoverLabel")
+          .transition()
+          .duration(200)
+          .attr("opacity", 0);
+      })
+      .on("click", function(event, d) {
+        event.stopPropagation();
+        // Show popup and create the bar chart after a slight delay.
+        d3.select("#popup").style("display", "flex");
+        d3.select("#popup .book-open").style("transform", "scale(1)");
+        // Clear any existing chart content.
+        d3.select("#chart-page").selectAll("*").remove();
+        setTimeout(createBarChart, 100);
+        // Update the right page with text about the mortality cause.
+        d3.select("#text-page").html(`
+          <h2 style="font-family:'Uncial Antiqua', serif; color:#3b2f2f;">${d.cause}</h2>
+          <p style="font-family:'Garamond', serif; color:#3b2f2f; font-size:16px;">
+            ${d.cause} is one of the major mortality causes impacting public health.
+            Detailed studies indicate that this cause contributes significantly to overall mortality rates.
+            Preventive measures and timely interventions are crucial in reducing its impact.
+          </p>
+        `);
+      });
+    
+    bookGroups.each(function(d) {
+      const g = d3.select(this);
+      if (d.type === "flat") {
+        g.append("rect")
+          .attr("x", -d.width/2)
+          .attr("y", -d.thickness)
+          .attr("width", d.width)
+          .attr("height", d.thickness)
+          .attr("rx", 3)
+          .attr("ry", 3)
+          .attr("fill", "url(#bookGradient)")
+          .attr("stroke", "#5d473a");
+        g.append("text")
+          .text(d.cause)
+          .attr("x", -d.width/2 + 4)
+          .attr("y", -d.thickness/2)
+          .attr("fill", "#3b2f2f")
+          .attr("font-size", "8px")
+          .attr("text-anchor", "start")
+          .attr("transform", `rotate(-90, ${-d.width/2 + 4}, ${-d.thickness/2})`);
+        g.append("text")
+          .text(d.cause)
+          .attr("class", "hoverLabel")
+          .attr("x", 0)
+          .attr("y", -d.thickness/2 + 4)
+          .attr("text-anchor", "middle")
+          .attr("opacity", 0);
+      } else {
+        g.append("rect")
+          .attr("x", -d.thickness/2)
+          .attr("y", -d.length)
+          .attr("width", d.thickness)
+          .attr("height", d.length)
+          .attr("rx", 3)
+          .attr("ry", 3)
+          .attr("fill", "url(#bookGradient)")
+          .attr("stroke", "#5d473a");
+        g.append("text")
+          .text(d.cause)
+          .attr("x", -d.thickness/2 + 2)
+          .attr("y", -d.length/2)
+          .attr("fill", "#3b2f2f")
+          .attr("font-size", "8px")
+          .attr("text-anchor", "start")
+          .attr("transform", `rotate(-90, ${-d.thickness/2 + 2}, ${-d.length/2})`);
+        g.append("text")
+          .text(d.cause)
+          .attr("class", "hoverLabel")
+          .attr("x", 0)
+          .attr("y", -d.length/2 + 4)
+          .attr("text-anchor", "middle")
+          .attr("opacity", 0);
+      }
+    });
+    
+    bookGroups.transition()
+      .duration(1000)
+      .delay((d, i) => i * 200)
+      .attr("opacity", 1);
+    
+    /***********************
+     * Mouse Animation (Unchanged)
+     ***********************/
+    function runMouse() {
+      const mouseGroup = svg.append("g")
+                            .attr("class", "mouse");
+      mouseGroup.append("ellipse")
+                .attr("cx", 0)
+                .attr("cy", 0)
+                .attr("rx", 10)
+                .attr("ry", 5)
+                .attr("fill", "#8e8e8e");
+      mouseGroup.append("circle")
+                .attr("cx", 12)
+                .attr("cy", -3)
+                .attr("r", 4)
+                .attr("fill", "#8e8e8e");
+      mouseGroup.append("path")
+                .attr("d", "M -10,0 Q -20,-5, -15,5")
+                .attr("stroke", "#8e8e8e")
+                .attr("stroke-width", 2)
+                .attr("fill", "none");
+      const startY = height * 0.75 - 10;
+      mouseGroup.attr("transform", `translate(${-50}, ${startY})`);
+      mouseGroup.transition()
+                .duration(4000)
+                .ease(d3.easeLinear)
+                .attr("transform", `translate(${width + 50}, ${startY})`)
+                .on("end", () => mouseGroup.remove());
+    }
+    
+    function scheduleMouse() {
+      const delay = 5000 + Math.random() * 10000;
+      setTimeout(() => {
+        runMouse();
+        scheduleMouse();
+      }, delay);
+    }
+    
+    scheduleMouse();
+    
+    /***********************
+     * Bar Chart in the Popup Book (Book of Kells Style)
+     ***********************/
+    // Sample data for the bar chart.
+    const chartData = [
+      {category: "Heart Disease", value: 40},
+      {category: "Stroke", value: 15},
+      {category: "Cancer", value: 50},
+      {category: "Influenza", value: 10},
+      {category: "Pneumonia", value: 20}
+    ];
+    
+    // Create the bar chart inside the left page of the popup.
+    function createBarChart() {
+      const chartContainer = document.getElementById("chart-page");
+      const chartWidth = chartContainer.clientWidth,
+            chartHeight = chartContainer.clientHeight;
+      // Increase bottom margin to prevent chart from overrunning.
+      const margin = {top: 20, right: 20, bottom: 40, left: 120};
+      const widthChart = chartWidth - margin.left - margin.right;
+      const heightChart = chartHeight - margin.top - margin.bottom;
+      
+      const svgChart = d3.select("#chart-page")
+        .append("svg")
+        .attr("width", chartWidth)
+        .attr("height", chartHeight)
+        .append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`);
+      
+      const x = d3.scaleLinear()
+                  .domain([0, d3.max(chartData, d => d.value)])
+                  .range([0, widthChart]);
+      
+      const y = d3.scaleBand()
+                  .domain(chartData.map(d => d.category))
+                  .range([0, heightChart])
+                  .padding(0.3);
+      
+      // Draw bars with a gold-like color reminiscent of illuminated manuscripts.
+      svgChart.selectAll("rect")
+        .data(chartData)
+        .enter()
+        .append("rect")
+        .attr("y", d => y(d.category))
+        .attr("height", y.bandwidth())
+        .attr("x", 0)
+        .attr("width", d => x(d.value))
+        .attr("fill", "#cfa05a");
+      
+      // Add value labels at the end of each bar.
+      svgChart.selectAll(".value-label")
+        .data(chartData)
+        .enter()
+        .append("text")
+        .attr("class", "chart-text")
+        .attr("x", d => x(d.value) + 5)
+        .attr("y", d => y(d.category) + y.bandwidth()/2)
+        .attr("dy", "0.35em")
+        .text(d => d.value);
+      
+      // Add category labels on the left.
+      svgChart.selectAll(".category-label")
+        .data(chartData)
+        .enter()
+        .append("text")
+        .attr("class", "chart-text")
+        .attr("x", -5)
+        .attr("y", d => y(d.category) + y.bandwidth()/2)
+        .attr("dy", "0.35em")
+        .attr("text-anchor", "end")
+        .text(d => d.category);
+    }
+  </script>
+</body>
+</html>
