@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Interactive Library with Open Book Popup and Celtic Bar Chart</title>
-  <!-- Google Font to evoke a Book of Kells style -->
+  <title>Interactive Library with Enhanced Spine Text</title>
+  <!-- Google Font to evoke a Book of Kells style (if desired for other text) -->
   <link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&display=swap" rel="stylesheet">
   <style>
     /* Use the provided background image for a traditional library,
@@ -33,12 +33,6 @@
       stroke: #555;
       stroke-width: 1;
     }
-    /* Hover label styling for books */
-    .hoverLabel {
-      fill: #ffffff;
-      font-size: 10px;
-      pointer-events: none;
-    }
     /* Popup overlay for the open book view */
     #popup {
       position: fixed;
@@ -52,11 +46,11 @@
       justify-content: center;
       z-index: 1000;
     }
-    /* The open book container */
+    /* The open book container - slightly smaller to avoid scrollbars */
     #popup .book-open {
-      width: 80%;
-      max-width: 800px;
-      height: 60%;
+      width: 70%;
+      max-width: 700px;
+      height: 50%;
       background: #f5f5dc;  /* Light beige simulating a book cover */
       display: flex;
       box-shadow: 0 0 30px rgba(0,0,0,0.5);
@@ -71,20 +65,21 @@
       border: 1px solid #ddd;
       box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
       position: relative;
-      overflow: auto;
+      overflow: hidden;
     }
     /* Left page will host the bar chart */
     #chart-page {
       width: 100%;
       height: 100%;
     }
-    /* Right page (now given an id for easy selection) will host descriptive text */
+    /* Right page will host descriptive text */
     #text-page {
       width: 100%;
       height: 100%;
       padding: 20px;
       font-family: 'Garamond', serif;
       color: #3b2f2f;
+      overflow: hidden;
     }
     /* Close button for the popup */
     #popup .close-btn {
@@ -115,7 +110,7 @@
     <div class="book-open">
       <!-- Left page: contains the bar chart -->
       <div class="page" id="chart-page"></div>
-      <!-- Right page: will display text about the mortality cause -->
+      <!-- Right page: displays text about the mortality cause -->
       <div class="page" id="text-page"></div>
     </div>
   </div>
@@ -211,7 +206,7 @@
     /***********************
      * Book Stack Group
      ***********************/
-    // Set y=0 at the floor.
+    // Set y = 0 at the floor.
     const stackGroup = svg.append("g")
                           .attr("transform", `translate(${width / 2}, ${height * 0.75})`);
     
@@ -308,7 +303,7 @@
       .attr("ry", 3);
     
     /***********************
-     * Draw Books and Add Hover Labels & Click Interaction
+     * Draw Books and Add Click Interaction
      ***********************/
     const bookGroups = stackGroup.selectAll(".bookGroup")
       .data(allBooks)
@@ -317,33 +312,20 @@
       .attr("class", "bookGroup")
       .attr("transform", d => `translate(${d.xOffset}, ${d.yOffset}) rotate(${d.rotation})`)
       .attr("opacity", 0)
-      .on("mouseover", function(event, d) {
-        d3.select(this).select(".hoverLabel")
-          .transition()
-          .duration(200)
-          .attr("opacity", 1);
-      })
-      .on("mouseout", function(event, d) {
-        d3.select(this).select(".hoverLabel")
-          .transition()
-          .duration(200)
-          .attr("opacity", 0);
-      })
       .on("click", function(event, d) {
         event.stopPropagation();
-        // Show popup and create the bar chart after a slight delay.
+        // Show popup, scale open book to full size.
         d3.select("#popup").style("display", "flex");
         d3.select("#popup .book-open").style("transform", "scale(1)");
-        // Clear any existing chart content.
+        // Clear and create bar chart.
         d3.select("#chart-page").selectAll("*").remove();
         setTimeout(createBarChart, 100);
-        // Update the right page with text about the mortality cause.
+        // Populate right page with descriptive text.
         d3.select("#text-page").html(`
           <h2 style="font-family:'Uncial Antiqua', serif; color:#3b2f2f;">${d.cause}</h2>
           <p style="font-family:'Garamond', serif; color:#3b2f2f; font-size:16px;">
-            ${d.cause} is one of the major mortality causes impacting public health.
-            Detailed studies indicate that this cause contributes significantly to overall mortality rates.
-            Preventive measures and timely interventions are crucial in reducing its impact.
+            ${d.cause} is a significant mortality cause affecting public health.
+            Research indicates that timely intervention and preventive measures can greatly reduce its impact.
           </p>
         `);
       });
@@ -360,21 +342,16 @@
           .attr("ry", 3)
           .attr("fill", "url(#bookGradient)")
           .attr("stroke", "#5d473a");
+        // Improved spine text: increased font-size, centered, and always visible.
         g.append("text")
           .text(d.cause)
           .attr("x", -d.width/2 + 4)
           .attr("y", -d.thickness/2)
           .attr("fill", "#3b2f2f")
-          .attr("font-size", "8px")
-          .attr("text-anchor", "start")
-          .attr("transform", `rotate(-90, ${-d.width/2 + 4}, ${-d.thickness/2})`);
-        g.append("text")
-          .text(d.cause)
-          .attr("class", "hoverLabel")
-          .attr("x", 0)
-          .attr("y", -d.thickness/2 + 4)
+          .attr("font-size", "10px")
           .attr("text-anchor", "middle")
-          .attr("opacity", 0);
+          .attr("dominant-baseline", "middle")
+          .attr("transform", `rotate(-90, ${-d.width/2 + 4}, ${-d.thickness/2})`);
       } else {
         g.append("rect")
           .attr("x", -d.thickness/2)
@@ -390,16 +367,10 @@
           .attr("x", -d.thickness/2 + 2)
           .attr("y", -d.length/2)
           .attr("fill", "#3b2f2f")
-          .attr("font-size", "8px")
-          .attr("text-anchor", "start")
-          .attr("transform", `rotate(-90, ${-d.thickness/2 + 2}, ${-d.length/2})`);
-        g.append("text")
-          .text(d.cause)
-          .attr("class", "hoverLabel")
-          .attr("x", 0)
-          .attr("y", -d.length/2 + 4)
+          .attr("font-size", "10px")
           .attr("text-anchor", "middle")
-          .attr("opacity", 0);
+          .attr("dominant-baseline", "middle")
+          .attr("transform", `rotate(-90, ${-d.thickness/2 + 2}, ${-d.length/2})`);
       }
     });
     
@@ -450,9 +421,29 @@
     scheduleMouse();
     
     /***********************
+     * Popup Close Button & Outside Click Interaction
+     ***********************/
+    d3.select("#popup .close-btn").on("click", function() {
+      d3.select("#popup .book-open")
+        .style("transform", "scale(0.8)");
+      d3.select("#popup").transition()
+        .duration(300)
+        .style("display", "none");
+    });
+    
+    d3.select("#popup").on("click", function(event) {
+      if (event.target.id === "popup") {
+        d3.select("#popup .book-open")
+          .style("transform", "scale(0.8)");
+        d3.select("#popup").transition()
+          .duration(300)
+          .style("display", "none");
+      }
+    });
+    
+    /***********************
      * Bar Chart in the Popup Book (Book of Kells Style)
      ***********************/
-    // Sample data for the bar chart.
     const chartData = [
       {category: "Heart Disease", value: 40},
       {category: "Stroke", value: 15},
@@ -461,12 +452,10 @@
       {category: "Pneumonia", value: 20}
     ];
     
-    // Create the bar chart inside the left page of the popup.
     function createBarChart() {
       const chartContainer = document.getElementById("chart-page");
       const chartWidth = chartContainer.clientWidth,
             chartHeight = chartContainer.clientHeight;
-      // Increase bottom margin to prevent chart from overrunning.
       const margin = {top: 20, right: 20, bottom: 40, left: 120};
       const widthChart = chartWidth - margin.left - margin.right;
       const heightChart = chartHeight - margin.top - margin.bottom;
@@ -487,7 +476,6 @@
                   .range([0, heightChart])
                   .padding(0.3);
       
-      // Draw bars with a gold-like color reminiscent of illuminated manuscripts.
       svgChart.selectAll("rect")
         .data(chartData)
         .enter()
@@ -498,7 +486,6 @@
         .attr("width", d => x(d.value))
         .attr("fill", "#cfa05a");
       
-      // Add value labels at the end of each bar.
       svgChart.selectAll(".value-label")
         .data(chartData)
         .enter()
@@ -509,7 +496,6 @@
         .attr("dy", "0.35em")
         .text(d => d.value);
       
-      // Add category labels on the left.
       svgChart.selectAll(".category-label")
         .data(chartData)
         .enter()
